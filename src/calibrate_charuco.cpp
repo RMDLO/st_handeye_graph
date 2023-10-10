@@ -7,7 +7,7 @@
 #include <opencv2/opencv.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
-
+#include <opencv2/aruco/charuco.hpp>
 #include <st_handeye/st_handeye.hpp>
 
 /**
@@ -55,14 +55,6 @@ public:
 
             matrix.push_back(row);
         }
-
-        // std::cout << filename << std::endl;
-        // for(int i = 0; i < matrix.size(); i++){
-        //     for(int j = 0; j < matrix[0].size(); j++){
-        //         std::cout << matrix[i][j] << ", ";
-        //     }
-        //     std::cout << "\n";
-        // }
         
         // temp fix, bad
         Eigen::MatrixXd m(4, 4);
@@ -72,20 +64,13 @@ public:
             }
         }
 
-        // Eigen::MatrixXd m(matrix.size(), matrix[0].size());
-        // for(int i=0; i<matrix.size(); i++) {
-        //     for(int j=0; j<matrix[i].size(); j++) {
-        //         m(i, j) = matrix[i][j];
-        //     }
-        // }
-
         return m;
     }
 
-    static std::shared_ptr<Dataset> read(const std::string& dataset_dir, const std::string& ros_camera_params_file, bool visualize) {
-        int PATTERN_ROWS = 9;
-        int PATTERN_COLS = 11;
-        double L = 0.0202;
+    static std::shared_ptr<Dataset> read(const std::string& dataset_dir, const std::string& ros_camera_params_file, cv::Ptr<cv::aruco::Dictionary> dictionary, cv::Ptr<cv::aruco::CharucoBoard> board, bool visualize) {
+        int PATTERN_ROWS = 4;
+        int PATTERN_COLS = 6;
+        double L = 0.024;
         std::shared_ptr<Dataset> dataset(new Dataset());
         dataset->pattern_3d.resize(3, PATTERN_ROWS * PATTERN_COLS);
         for(int j=0; j<PATTERN_COLS; j++) {
@@ -118,7 +103,7 @@ public:
             std::string data_id = filename.substr(suffix_loc - 3, 3);
 
             cv::Mat image = cv::imread(dataset_dir + "/" + data_id + "_image.jpg");
-            Eigen::Matrix4d handpose = read_matrix(dataset_dir + "/" + data_id + "_pose.csv");
+            Eigen::Matrix4d handpose = read_matrix(dataset_dir + "/" + data_id + ".csv");
 
             if(ros_camera_params_file.empty()) {
                 dataset->camera_matrix = read_matrix(dataset_dir + "/" + data_id + "_camera_matrix.csv");
@@ -131,28 +116,37 @@ public:
             cv::Mat undistorted;
             cv::undistort(image, undistorted, cv_camera_matrix, cv_distortion);
 
-            // std::cout << "reached here" << std::endl;
+            cv::Mat imageCopy;
+            std::vector<int> markerIds;
+            image.copyTo(imageCopy);
+            std::vector<std::vector<cv::Point2f> > markerCorners;
+            cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
+            params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;
+            cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
 
-            cv::Mat cv_grid_2d;
-            bool ret = cv::findChessboardCorners(undistorted, cv::Size(PATTERN_ROWS, PATTERN_COLS), cv_grid_2d, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
-            cv::drawChessboardCorners(undistorted, cv::Size(PATTERN_ROWS, PATTERN_COLS), cv_grid_2d, ret);
+            cv::aruco::drawDetectedMarkers(imageCopy, markerCorners, cv::noArray());
+            std::vector<cv::Point2f> charucoCorners;
+            std::vector<int> charucoIds;
+            std::vector<cv::Point3f> charucoPoints3D;
+            std::vector<cv::Point2f> imgPoints;
+            cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, board, charucoCorners, charucoIds, cv_camera_matrix, cv_distortion, 0);
+            cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, cv::noArray(), cv::Scalar(255, 0, 0));
+            cv::Mat rvec, tvec;
+            bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cv_camera_matrix, cv_distortion, rvec, tvec);
 
-            if(!ret) {
-                std::cerr << "failed to find circles!!" << std::endl;
-                std::cerr << filename << std::endl;
-                continue;
+            for (int i = 0; i < charucoCorners.size()-1; i++) {
+                cv::line(imageCopy, charucoCorners[i], charucoCorners[i+1], cv::Scalar(0, 255, 0));
             }
+
+            cv::drawFrameAxes(imageCopy, cv_camera_matrix, cv_distortion, rvec, tvec, 0.1f);
+
+            cv::imwrite(dataset_dir + "/" + data_id + "_image_charuco.jpg", imageCopy);
 
             Eigen::MatrixXd grid_2d(2, PATTERN_ROWS * PATTERN_COLS);
-            for(int i=0; i<PATTERN_ROWS * PATTERN_COLS; i++) {
-                grid_2d(0, i) = cv_grid_2d.at<cv::Vec2f>(i)[0];
-                grid_2d(1, i) = cv_grid_2d.at<cv::Vec2f>(i)[1];
+            for (int i = 0; i < PATTERN_ROWS * PATTERN_COLS; i++) {
+                grid_2d(0, i) = charucoCorners[i].x;
+                grid_2d(1, i) = charucoCorners[i].y;
             }
-
-            std::cout << grid_2d << std::endl;
-
-            std::cout << "Number of rows: " << grid_2d.rows() << std::endl;
-            std::cout << "Number of columns: " << grid_2d.cols() << std::endl;
             
             dataset->images.push_back(undistorted);
             dataset->handposes.push_back(handpose);
@@ -232,7 +226,7 @@ public:
 int main(int argc, char** argv) {
     using namespace boost::program_options;
 
-    options_description description("calibrate");
+    options_description description("calibrate_charuco");
     description.add_options()
             ("visualize,v", "if visualize")
             ("use_init_guess,u", "if true, the tsai's result is given to the graph-based method as initial guess")
@@ -271,7 +265,11 @@ int main(int argc, char** argv) {
         ros_camera_params_file = vm["camera_params"].as<std::string>();
     }
 
-    auto dataset = Dataset::read(dataset_dir, ros_camera_params_file, vm.count("visualize"));
+    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+    // cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(7, 10, 0.024f, 0.018f, dictionary);
+    cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.024f, 0.018f, dictionary);
+
+    auto dataset = Dataset::read(dataset_dir, ros_camera_params_file, dictionary, board, vm.count("visualize"));
 
     std::vector<Eigen::Isometry3d> world2hands(dataset->handposes.size());
     for(int i=0; i<dataset->handposes.size(); i++) {
