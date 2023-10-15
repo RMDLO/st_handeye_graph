@@ -3,7 +3,7 @@
 mkdir data
 
 camera_params="../calibration_data/20231006_camera_info.yaml"
-calib_test_dir="../calibration_data/20231011"
+calib_test_dir="../calibration_data/20231006"
 
 command="../build/calibrate_charuco -u"
 command="$command -c $camera_params"
