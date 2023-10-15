@@ -4,15 +4,19 @@ project(st_handeye)
 add_compile_options(-std=c++17)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-set(VISP_DIR ${VISP_DIR} "/home/hollydinkel/visp-build-release")
+#add generic path / specify this in documentation before build
+set(VISP_DIR ${VISP_DIR} "/home/raghav/visp/visp-build")
 set(Eigen3_DIR ${Eigen3_DIR} "/usr/include/eigen3")
-set(OpenCV_DIR ${OpenCV_DIR} "/home/hollydinkel/opencv-4.x") # opencv4
+#opencv3 on raghav's 
+set(OpenCV3_DIR “/usr/local/opencv3/share/OpenCV”)
 
 find_package(G2O REQUIRED)
 find_package(VISP REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(OpenCV REQUIRED)
+# set 3.4.19
+find_package(OpenCV 3.4.19 EXACT REQUIRED)
 find_package(Boost REQUIRED filesystem program_options)
+#new package
 find_package(Ceres REQUIRED)
 
 include_directories(
