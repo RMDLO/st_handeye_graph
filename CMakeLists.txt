@@ -12,7 +12,9 @@ find_package(G2O REQUIRED)
 find_package(VISP REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
+
 find_package(Boost REQUIRED filesystem program_options)
+
 find_package(Ceres REQUIRED)
 
 include_directories(
