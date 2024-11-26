@@ -142,6 +142,7 @@ public:
 
             cv::imwrite(dataset_dir + "/" + data_id + "_image_charuco.jpg", imageCopy);
 
+            std::cout << "Number of detected charucoCorners: " << charucoCorners.size() << std::endl;
             Eigen::MatrixXd grid_2d(2, PATTERN_ROWS * PATTERN_COLS);
             for (int i = 0; i < PATTERN_ROWS * PATTERN_COLS; i++) {
                 grid_2d(0, i) = charucoCorners[i].x;
@@ -149,7 +150,7 @@ public:
             }
             
             dataset->images.push_back(undistorted);
-            dataset->handposes.push_back(handpose);
+            dataset->handposes.push_back(handpose.inverse());
             dataset->pattern_2ds.push_back(grid_2d);
 
             if(visualize) {
