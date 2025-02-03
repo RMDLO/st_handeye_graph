@@ -124,6 +124,11 @@ public:
             params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;
             cv::aruco::detectMarkers(image, board->dictionary, markerCorners, markerIds, params);
 
+            if(markerIds.empty()) {
+            std::cout << "No markers detected in image: " << data_id << std::endl;
+            continue;
+            }
+
             cv::aruco::drawDetectedMarkers(imageCopy, markerCorners, cv::noArray());
             std::vector<cv::Point2f> charucoCorners;
             std::vector<int> charucoIds;
@@ -142,6 +147,7 @@ public:
 
             cv::imwrite(dataset_dir + "/" + data_id + "_image_charuco.jpg", imageCopy);
 
+            std::cout << "Data id: " << data_id << std::endl;
             std::cout << "Number of detected charucoCorners: " << charucoCorners.size() << std::endl;
             Eigen::MatrixXd grid_2d(2, PATTERN_ROWS * PATTERN_COLS);
             for (int i = 0; i < PATTERN_ROWS * PATTERN_COLS; i++) {

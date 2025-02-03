@@ -2,8 +2,8 @@
 
 mkdir data
 
-camera_params="../calibration_data/20240829_oak_camera_info.yaml"
-calib_test_dir="../calibration_data/20240829"
+camera_params="../calibration_data/20250203_oak_camera_info.yaml"
+calib_test_dir="../calibration_data/20250203"
 
 command="../build/calibrate_charuco -u"
 command="$command -c $camera_params"
